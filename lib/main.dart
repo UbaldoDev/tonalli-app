@@ -81,7 +81,7 @@ class PantallaHome extends StatelessWidget {
                 children: [
                   _ModuloCard(icono: Icons.mic, titulo: 'Grabar', subtitulo: 'Preserva tu voz', color: const Color(0xFF2E7D32), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaGrabar()))),
                   _ModuloCard(icono: Icons.menu_book, titulo: 'Aprender', subtitulo: 'Lecciones interactivas', color: const Color(0xFF1565C0), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaAprender()))),
-                  _ModuloCard(icono: Icons.translate, titulo: 'Traducir', subtitulo: 'Espanol a lengua', color: const Color(0xFF6A1B9A), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaTraduccir()))),
+                  _ModuloCard(icono: Icons.translate, titulo: 'Traducir', subtitulo: 'Espanol a lengua', color: const Color(0xFF6A1B9A), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaTraducir()))),
                   _ModuloCard(icono: Icons.person, titulo: 'Perfil', subtitulo: 'Tu progreso', color: const Color(0xFFE65100), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaPerfil()))),
                 ],
               ),
@@ -123,13 +123,88 @@ class _ModuloCard extends StatelessWidget {
   }
 }
 
-class PantallaGrabar extends StatelessWidget {
+class PantallaGrabar extends StatefulWidget {
   const PantallaGrabar({super.key});
+  @override
+  State<PantallaGrabar> createState() => _PantallaGrabarState();
+}
+
+class _PantallaGrabarState extends State<PantallaGrabar> {
+  bool grabando = false;
+  List<String> grabaciones = [];
+  final TextEditingController _palabraController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xFF2E7D32), title: const Text('Grabar', style: TextStyle(color: Colors.white)), iconTheme: const IconThemeData(color: Colors.white)),
-      body: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.mic, size: 100, color: Color(0xFF2E7D32)), SizedBox(height: 20), Text('Modulo de Grabacion', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), SizedBox(height: 10), Text('Aqui podras grabar palabras\nen tu lengua indigena', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey))])),
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF2E7D32),
+        title: const Text('Grabar Palabra', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            const Text('Escribe la palabra en tu lengua:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _palabraController,
+              decoration: InputDecoration(
+                hintText: 'Ej: Guela (abuela en zapoteco)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 30),
+            GestureDetector(
+              onTap: () {
+                setState(() { grabando = !grabando; });
+                if (!grabando && _palabraController.text.isNotEmpty) {
+                  setState(() {
+                    grabaciones.add(_palabraController.text);
+                    _palabraController.clear();
+                  });
+                }
+              },
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: grabando ? Colors.red : const Color(0xFF2E7D32),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: (grabando ? Colors.red : const Color(0xFF2E7D32)).withOpacity(0.4), blurRadius: 20, spreadRadius: 5)],
+                ),
+                child: Icon(grabando ? Icons.stop : Icons.mic, size: 60, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(grabando ? 'Grabando... toca para detener' : 'Toca para grabar', style: TextStyle(fontSize: 14, color: grabando ? Colors.red : Colors.grey)),
+            const SizedBox(height: 30),
+            if (grabaciones.isNotEmpty) ...[
+              const Text('Palabras grabadas:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: grabaciones.length,
+                  itemBuilder: (context, index) {
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.mic, color: Color(0xFF2E7D32)),
+                        title: Text(grabaciones[index]),
+                        trailing: const Icon(Icons.play_arrow, color: Color(0xFF2E7D32)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -145,8 +220,8 @@ class PantallaAprender extends StatelessWidget {
   }
 }
 
-class PantallaTraduccir extends StatelessWidget {
-  const PantallaTraduccir({super.key});
+class PantallaTraducir extends StatelessWidget {
+  const PantallaTraducir({super.key});
   @override
   Widget build(BuildContext context) {
     return Scaffold(
