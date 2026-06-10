@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 
@@ -21,7 +22,124 @@ class TonalliApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)),
         useMaterial3: true,
       ),
-      home: const PantallaBienvenida(),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          if (snapshot.hasData) {
+            return const PantallaBienvenida();
+          }
+          return const PantallaLogin();
+        },
+      ),
+    );
+  }
+}
+
+class PantallaLogin extends StatefulWidget {
+  const PantallaLogin({super.key});
+  @override
+  State<PantallaLogin> createState() => _PantallaLoginState();
+}
+
+class _PantallaLoginState extends State<PantallaLogin> {
+  final _emailController = TextEditingController();
+  final _passController = TextEditingController();
+  bool cargando = false;
+  bool esRegistro = false;
+  String error = '';
+
+  Future<void> autenticar() async {
+    setState(() { cargando = true; error = ''; });
+    try {
+      if (esRegistro) {
+        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passController.text.trim(),
+        );
+        await FirebaseFirestore.instance.collection('usuarios').doc(cred.user!.uid).set({
+          'nombre': _emailController.text.split('@')[0],
+          'lengua': 'zapoteco',
+          'palabras_aprendidas': 0,
+          'dias_practica': 0,
+        });
+      } else {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passController.text.trim(),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        error = e.code == 'user-not-found' ? 'Usuario no encontrado' :
+                e.code == 'wrong-password' ? 'Contrasena incorrecta' :
+                e.code == 'email-already-in-use' ? 'Este correo ya esta registrado' :
+                e.code == 'weak-password' ? 'La contrasena debe tener al menos 6 caracteres' :
+                'Error: ${e.message}';
+      });
+    }
+    setState(() => cargando = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1B5E20),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.language, size: 70, color: Colors.white),
+              const SizedBox(height: 12),
+              const Text('Tonalli', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 4)),
+              const SizedBox(height: 8),
+              const Text('Preservando las voces de Oaxaca', style: TextStyle(fontSize: 13, color: Colors.white70, fontStyle: FontStyle.italic)),
+              const SizedBox(height: 40),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                child: Column(children: [
+                  Text(esRegistro ? 'Crear cuenta' : 'Iniciar sesion', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _emailController,
+                    decoration: InputDecoration(labelText: 'Correo electronico', prefixIcon: const Icon(Icons.email), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _passController,
+                    decoration: InputDecoration(labelText: 'Contrasena', prefixIcon: const Icon(Icons.lock), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                    obscureText: true,
+                  ),
+                  if (error.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(error, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  ],
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: cargando ? null : autenticar,
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      child: cargando ? const CircularProgressIndicator(color: Colors.white) : Text(esRegistro ? 'Registrarse' : 'Entrar', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => setState(() { esRegistro = !esRegistro; error = ''; }),
+                    child: Text(esRegistro ? '¿Ya tienes cuenta? Inicia sesion' : '¿No tienes cuenta? Registrate', style: const TextStyle(color: Color(0xFF1B5E20))),
+                  ),
+                ]),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -92,17 +210,15 @@ class _LenguaCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: seleccionada ? Colors.white : Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(16), border: Border.all(color: seleccionada ? Colors.white : Colors.transparent, width: 2)),
-        child: Row(
-          children: [
-            Text(icono, style: const TextStyle(fontSize: 36)),
-            const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(nombre, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: seleccionada ? const Color(0xFF1B5E20) : Colors.white)),
-              Text(region, style: TextStyle(fontSize: 13, color: seleccionada ? Colors.grey[600] : Colors.white70)),
-            ])),
-            if (seleccionada) const Icon(Icons.check_circle, color: Color(0xFF1B5E20), size: 28),
-          ],
-        ),
+        child: Row(children: [
+          Text(icono, style: const TextStyle(fontSize: 36)),
+          const SizedBox(width: 16),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(nombre, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: seleccionada ? const Color(0xFF1B5E20) : Colors.white)),
+            Text(region, style: TextStyle(fontSize: 13, color: seleccionada ? Colors.grey[600] : Colors.white70)),
+          ])),
+          if (seleccionada) const Icon(Icons.check_circle, color: Color(0xFF1B5E20), size: 28),
+        ]),
       ),
     );
   }
@@ -119,6 +235,7 @@ class _PantallaHomeState extends State<PantallaHome> {
   int palabrasAprendidas = 0;
   int diasPractica = 0;
   bool cargando = true;
+  String nombreUsuario = '';
 
   @override
   void initState() {
@@ -128,25 +245,21 @@ class _PantallaHomeState extends State<PantallaHome> {
 
   Future<void> cargarProgreso() async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('usuarios').doc('usuario_demo').get();
-      if (doc.exists) {
-        setState(() {
-          palabrasAprendidas = doc.data()?['palabras_aprendidas'] ?? 0;
-          diasPractica = doc.data()?['dias_practica'] ?? 0;
-          cargando = false;
-        });
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+        if (doc.exists) {
+          setState(() {
+            palabrasAprendidas = doc.data()?['palabras_aprendidas'] ?? 0;
+            diasPractica = doc.data()?['dias_practica'] ?? 0;
+            nombreUsuario = doc.data()?['nombre'] ?? '';
+            cargando = false;
+          });
+        }
       }
     } catch (e) {
       setState(() => cargando = false);
     }
-  }
-
-  Future<void> actualizarProgreso() async {
-    await FirebaseFirestore.instance.collection('usuarios').doc('usuario_demo').update({
-      'lengua': widget.lengua,
-      'dias_practica': FieldValue.increment(1),
-    });
-    cargarProgreso();
   }
 
   @override
@@ -158,46 +271,46 @@ class _PantallaHomeState extends State<PantallaHome> {
         title: const Text('Tonalli', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.swap_horiz, color: Colors.white), onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const PantallaBienvenida())), tooltip: 'Cambiar lengua'),
+          IconButton(icon: const Icon(Icons.logout, color: Colors.white), onPressed: () async {
+            await FirebaseAuth.instance.signOut();
+          }, tooltip: 'Cerrar sesion'),
         ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 10),
-            if (!cargando) Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFF1B5E20), borderRadius: BorderRadius.circular(16)),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 10),
+          if (!cargando) Container(
+            width: double.infinity, padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFF1B5E20), borderRadius: BorderRadius.circular(16)),
+            child: Column(children: [
+              Text('Hola, $nombreUsuario!', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 8),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                 _MiniStat(numero: '$palabrasAprendidas', label: 'Palabras'),
                 _MiniStat(numero: '$diasPractica', label: 'Dias'),
                 _MiniStat(numero: widget.lengua[0].toUpperCase() + widget.lengua.substring(1), label: 'Lengua'),
               ]),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          Text('Aprendiendo: ${widget.lengua[0].toUpperCase()}${widget.lengua.substring(1)}', style: const TextStyle(fontSize: 16, color: Colors.grey)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16,
+              children: [
+                _ModuloCard(icono: Icons.mic, titulo: 'Grabar', subtitulo: 'Preserva tu voz', color: const Color(0xFF2E7D32), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaGrabar()))),
+                _ModuloCard(icono: Icons.menu_book, titulo: 'Aprender', subtitulo: 'Lecciones interactivas', color: const Color(0xFF1565C0), onTap: () async {
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaAprender(lenguaInicial: widget.lengua)));
+                  cargarProgreso();
+                }),
+                _ModuloCard(icono: Icons.translate, titulo: 'Traducir', subtitulo: 'Espanol a lengua', color: const Color(0xFF6A1B9A), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaTraducir(lenguaInicial: widget.lengua)))),
+                _ModuloCard(icono: Icons.person, titulo: 'Perfil', subtitulo: 'Tu progreso', color: const Color(0xFFE65100), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaPerfil(lengua: widget.lengua, palabras: palabrasAprendidas, dias: diasPractica, nombre: nombreUsuario)))),
+              ],
             ),
-            const SizedBox(height: 20),
-            Text('Aprendiendo: ${widget.lengua[0].toUpperCase()}${widget.lengua.substring(1)}', style: const TextStyle(fontSize: 16, color: Colors.grey)),
-            const SizedBox(height: 16),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                children: [
-                  _ModuloCard(icono: Icons.mic, titulo: 'Grabar', subtitulo: 'Preserva tu voz', color: const Color(0xFF2E7D32), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaGrabar()))),
-                  _ModuloCard(icono: Icons.menu_book, titulo: 'Aprender', subtitulo: 'Lecciones interactivas', color: const Color(0xFF1565C0), onTap: () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaAprender(lenguaInicial: widget.lengua)));
-                    cargarProgreso();
-                  }),
-                  _ModuloCard(icono: Icons.translate, titulo: 'Traducir', subtitulo: 'Espanol a lengua', color: const Color(0xFF6A1B9A), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaTraducir(lenguaInicial: widget.lengua)))),
-                  _ModuloCard(icono: Icons.person, titulo: 'Perfil', subtitulo: 'Tu progreso', color: const Color(0xFFE65100), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaPerfil(lengua: widget.lengua, palabras: palabrasAprendidas, dias: diasPractica)))),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ]),
       ),
     );
   }
@@ -207,7 +320,6 @@ class _MiniStat extends StatelessWidget {
   final String numero;
   final String label;
   const _MiniStat({required this.numero, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Column(children: [
@@ -224,7 +336,6 @@ class _ModuloCard extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   const _ModuloCard({required this.icono, required this.titulo, required this.subtitulo, required this.color, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -253,7 +364,6 @@ class _PantallaGrabarState extends State<PantallaGrabar> {
   bool grabando = false;
   List<String> grabaciones = [];
   final TextEditingController _palabraController = TextEditingController();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -338,9 +448,12 @@ class _PantallaAprenderState extends State<PantallaAprender> {
   }
 
   Future<void> guardarProgreso() async {
-    await FirebaseFirestore.instance.collection('usuarios').doc('usuario_demo').update({
-      'palabras_aprendidas': FieldValue.increment(1),
-    });
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).update({
+        'palabras_aprendidas': FieldValue.increment(1),
+      });
+    }
   }
 
   @override
@@ -390,10 +503,7 @@ class _PantallaAprenderState extends State<PantallaAprender> {
             const SizedBox(height: 20),
             Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
               ElevatedButton.icon(
-                onPressed: () async {
-                  await guardarProgreso();
-                  setState(() { correctas++; mostrarRespuesta = false; if (indice < lista.length - 1) indice++; });
-                },
+                onPressed: () async { await guardarProgreso(); setState(() { correctas++; mostrarRespuesta = false; if (indice < lista.length - 1) indice++; }); },
                 icon: const Icon(Icons.check), label: const Text('Lo sabia'),
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
               ),
@@ -417,7 +527,6 @@ class _LenguaBtn extends StatelessWidget {
   final bool activa;
   final VoidCallback onTap;
   const _LenguaBtn({required this.titulo, required this.activa, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -533,7 +642,6 @@ class _LenguaBtn2 extends StatelessWidget {
   final bool activa;
   final VoidCallback onTap;
   const _LenguaBtn2({required this.titulo, required this.activa, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -551,7 +659,8 @@ class PantallaPerfil extends StatelessWidget {
   final String lengua;
   final int palabras;
   final int dias;
-  const PantallaPerfil({super.key, required this.lengua, required this.palabras, required this.dias});
+  final String nombre;
+  const PantallaPerfil({super.key, required this.lengua, required this.palabras, required this.dias, required this.nombre});
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +673,7 @@ class PantallaPerfil extends StatelessWidget {
           const SizedBox(height: 20),
           const CircleAvatar(radius: 50, backgroundColor: Color(0xFFE65100), child: Icon(Icons.person, size: 60, color: Colors.white)),
           const SizedBox(height: 16),
-          const Text('Estudiante Tonalli', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text(nombre.isNotEmpty ? nombre : 'Estudiante Tonalli', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           Text('Aprendiendo: ${lengua[0].toUpperCase()}${lengua.substring(1)}', style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 30),
           Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
@@ -589,7 +698,6 @@ class _StatCard extends StatelessWidget {
   final String label;
   final Color color;
   const _StatCard({required this.numero, required this.label, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -605,7 +713,6 @@ class _LenguaProgress extends StatelessWidget {
   final double progreso;
   final Color color;
   const _LenguaProgress({required this.lengua, required this.progreso, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Padding(
