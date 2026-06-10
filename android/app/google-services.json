@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "61957962685",
+    "project_id": "tonalli-app",
+    "storage_bucket": "tonalli-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61957962685:android:5163ca2820c9760f4db0d4",
+        "android_client_info": {
+          "package_name": "com.example.tonalli_app2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBMKshcXt6YMh1L5ak980tfxd3Nebn5Jf0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
